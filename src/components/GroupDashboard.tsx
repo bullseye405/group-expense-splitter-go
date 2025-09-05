@@ -1,4 +1,5 @@
 import { getGroupById } from '@/api/groups';
+import { updateGroupName } from '@/api/groups';
 import { recordGroupView } from '@/api/groupViews';
 import {
   createExpense,
@@ -33,6 +34,9 @@ import { GroupWithParticipants } from '@/types/group';
 export function GroupDashboard() {
   const { groupId } = useParams<{ groupId: string }>();
   const [group, setGroup] = useState<GroupWithParticipants>();
+  const [editingName, setEditingName] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [nameLoading, setNameLoading] = useState(false);
   const [expenses, setExpenses] = useState<ExpenseWithSplits[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
@@ -314,6 +318,33 @@ export function GroupDashboard() {
     );
   };
 
+    const handleSaveName = async () => {
+    if (!groupId || !newGroupName.trim()) return;
+    setNameLoading(true);
+    try {
+      const { data, error } = await updateGroupName(groupId, newGroupName, group?.description);
+      if (error || !data) {
+        toast({
+          title: 'Error updating group name',
+          description: error?.message || 'Could not update group name.',
+          variant: 'destructive',
+        });
+        setNameLoading(false);
+        return;
+      }
+      setGroup((prevGroup) => prevGroup ? { ...prevGroup, name: newGroupName } : prevGroup);
+      setEditingName(false);
+    } catch (err) {
+      toast({
+        title: 'Error updating group name',
+        description: String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setNameLoading(false);
+    }
+  };
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 flex items-center justify-center">
@@ -347,14 +378,66 @@ export function GroupDashboard() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              {group.name}
-            </h1>
+            <div className="flex items-center gap-2">
+              {editingName ? (
+                <input
+                  className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent border-b border-blue-300 outline-none px-2"
+                  value={newGroupName}
+                  onChange={e => setNewGroupName(e.target.value)}
+                  disabled={nameLoading}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveName();
+                    if (e.key === 'Escape') setEditingName(false);
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  {group.name}
+                </h1>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="ml-2"
+                onClick={() => {
+                  setEditingName(true);
+                  setNewGroupName(group.name);
+                }}
+                disabled={editingName}
+                aria-label="Edit group name"
+              >
+                <Edit className="w-5 h-5 text-blue-600" />
+              </Button>
+              {editingName && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-2"
+                  onClick={handleSaveName}
+                  disabled={nameLoading || !newGroupName.trim()}
+                >
+                  Save
+                </Button>
+              )}
+              {editingName && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-1"
+                  onClick={() => setEditingName(false)}
+                  disabled={nameLoading}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
             <p className="text-slate-600 mt-1">
               {group.description ||
                 'Track expenses and settle debts with your group'}
             </p>
           </div>
+
 
           <Button
             onClick={handleShare}
